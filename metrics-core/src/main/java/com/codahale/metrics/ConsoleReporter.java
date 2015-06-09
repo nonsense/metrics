@@ -33,6 +33,7 @@ public class ConsoleReporter extends ScheduledReporter {
         private TimeUnit rateUnit;
         private TimeUnit durationUnit;
         private MetricFilter filter;
+        private boolean resetCountersWhenReporting;
 
         private Builder(MetricRegistry registry) {
             this.registry = registry;
@@ -43,6 +44,7 @@ public class ConsoleReporter extends ScheduledReporter {
             this.rateUnit = TimeUnit.SECONDS;
             this.durationUnit = TimeUnit.MILLISECONDS;
             this.filter = MetricFilter.ALL;
+            this.resetCountersWhenReporting = false;
         }
 
         /**
@@ -122,6 +124,11 @@ public class ConsoleReporter extends ScheduledReporter {
             return this;
         }
 
+        public Builder withResettingCounters() {
+            this.resetCountersWhenReporting = true;
+            return this;
+        }
+
         /**
          * Builds a {@link ConsoleReporter} with the given properties.
          *
@@ -135,7 +142,8 @@ public class ConsoleReporter extends ScheduledReporter {
                                        timeZone,
                                        rateUnit,
                                        durationUnit,
-                                       filter);
+                                       filter,
+                                       resetCountersWhenReporting);
         }
     }
 
@@ -145,6 +153,7 @@ public class ConsoleReporter extends ScheduledReporter {
     private final Locale locale;
     private final Clock clock;
     private final DateFormat dateFormat;
+    private final boolean resetCountersWhenReporting;
 
     private ConsoleReporter(MetricRegistry registry,
                             PrintStream output,
@@ -153,7 +162,8 @@ public class ConsoleReporter extends ScheduledReporter {
                             TimeZone timeZone,
                             TimeUnit rateUnit,
                             TimeUnit durationUnit,
-                            MetricFilter filter) {
+                            MetricFilter filter,
+                            boolean resetCountersWhenReporting) {
         super(registry, "console-reporter", filter, rateUnit, durationUnit);
         this.output = output;
         this.locale = locale;
@@ -162,6 +172,7 @@ public class ConsoleReporter extends ScheduledReporter {
                                                          DateFormat.MEDIUM,
                                                          locale);
         dateFormat.setTimeZone(timeZone);
+        this.resetCountersWhenReporting = resetCountersWhenReporting;
     }
 
     @Override
@@ -224,7 +235,10 @@ public class ConsoleReporter extends ScheduledReporter {
     }
 
     private void printMeter(Meter meter) {
-        output.printf(locale, "             count = %d%n", meter.getCount());
+
+        final long count = resetCountersWhenReporting ? meter.getCountWithReset() : meter.getCount();
+
+        output.printf(locale, "             count = %d%n", count);
         output.printf(locale, "         mean rate = %2.2f events/%s%n", convertRate(meter.getMeanRate()), getRateUnit());
         output.printf(locale, "     1-minute rate = %2.2f events/%s%n", convertRate(meter.getOneMinuteRate()), getRateUnit());
         output.printf(locale, "     5-minute rate = %2.2f events/%s%n", convertRate(meter.getFiveMinuteRate()), getRateUnit());
@@ -232,7 +246,8 @@ public class ConsoleReporter extends ScheduledReporter {
     }
 
     private void printCounter(Map.Entry<String, Counter> entry) {
-        output.printf(locale, "             count = %d%n", entry.getValue().getCount());
+        final long count = resetCountersWhenReporting ? entry.getValue().getCountWithReset() : entry.getValue().getCount();
+        output.printf(locale, "             count = %d%n", count);
     }
 
     private void printGauge(Map.Entry<String, Gauge> entry) {
@@ -240,7 +255,10 @@ public class ConsoleReporter extends ScheduledReporter {
     }
 
     private void printHistogram(Histogram histogram) {
-        output.printf(locale, "             count = %d%n", histogram.getCount());
+
+        final long count = resetCountersWhenReporting ? histogram.getCountWithReset() : histogram.getCount();
+
+        output.printf(locale, "             count = %d%n", count);
         Snapshot snapshot = histogram.getSnapshot();
         output.printf(locale, "               min = %d%n", snapshot.getMin());
         output.printf(locale, "               max = %d%n", snapshot.getMax());
@@ -255,8 +273,11 @@ public class ConsoleReporter extends ScheduledReporter {
     }
 
     private void printTimer(Timer timer) {
+
+        final long count = resetCountersWhenReporting ? timer.getCountWithReset() : timer.getCount();
+
         final Snapshot snapshot = timer.getSnapshot();
-        output.printf(locale, "             count = %d%n", timer.getCount());
+        output.printf(locale, "             count = %d%n", count);
         output.printf(locale, "         mean rate = %2.2f calls/%s%n", convertRate(timer.getMeanRate()), getRateUnit());
         output.printf(locale, "     1-minute rate = %2.2f calls/%s%n", convertRate(timer.getOneMinuteRate()), getRateUnit());
         output.printf(locale, "     5-minute rate = %2.2f calls/%s%n", convertRate(timer.getFiveMinuteRate()), getRateUnit());

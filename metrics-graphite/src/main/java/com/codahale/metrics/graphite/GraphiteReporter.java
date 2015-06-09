@@ -38,6 +38,7 @@ public class GraphiteReporter extends ScheduledReporter {
         private TimeUnit rateUnit;
         private TimeUnit durationUnit;
         private MetricFilter filter;
+        private boolean resetCountersWhenReporting;
 
         private Builder(MetricRegistry registry) {
             this.registry = registry;
@@ -46,6 +47,7 @@ public class GraphiteReporter extends ScheduledReporter {
             this.rateUnit = TimeUnit.SECONDS;
             this.durationUnit = TimeUnit.MILLISECONDS;
             this.filter = MetricFilter.ALL;
+            this.resetCountersWhenReporting = false;
         }
 
         /**
@@ -103,6 +105,11 @@ public class GraphiteReporter extends ScheduledReporter {
             return this;
         }
 
+        public Builder withResettingCounters() {
+            this.resetCountersWhenReporting = true;
+            return this;
+        }
+
         /**
          * Builds a {@link GraphiteReporter} with the given properties, sending metrics using the
          * given {@link GraphiteSender}.
@@ -117,7 +124,8 @@ public class GraphiteReporter extends ScheduledReporter {
                                         prefix,
                                         rateUnit,
                                         durationUnit,
-                                        filter);
+                                        filter,
+                                        resetCountersWhenReporting);
         }
     }
 
@@ -126,6 +134,7 @@ public class GraphiteReporter extends ScheduledReporter {
     private final GraphiteSender graphite;
     private final Clock clock;
     private final String prefix;
+    private final boolean resetCountersWhenReporting;
 
     private GraphiteReporter(MetricRegistry registry,
                              GraphiteSender graphite,
@@ -133,11 +142,13 @@ public class GraphiteReporter extends ScheduledReporter {
                              String prefix,
                              TimeUnit rateUnit,
                              TimeUnit durationUnit,
-                             MetricFilter filter) {
+                             MetricFilter filter,
+                             boolean resetCountersWhenReporting) {
         super(registry, "graphite-reporter", filter, rateUnit, durationUnit);
         this.graphite = graphite;
         this.clock = clock;
         this.prefix = prefix;
+        this.resetCountersWhenReporting = resetCountersWhenReporting;
     }
 
     @Override
@@ -230,7 +241,10 @@ public class GraphiteReporter extends ScheduledReporter {
     }
 
     private void reportMetered(String name, Metered meter, long timestamp) throws IOException {
-        graphite.send(prefix(name, "count"), format(meter.getCount()), timestamp);
+
+        long count = resetCountersWhenReporting ? meter.getCountWithReset() : meter.getCount();
+
+        graphite.send(prefix(name, "count"), format(count), timestamp);
         graphite.send(prefix(name, "m1_rate"),
                       format(convertRate(meter.getOneMinuteRate())),
                       timestamp);
@@ -246,8 +260,11 @@ public class GraphiteReporter extends ScheduledReporter {
     }
 
     private void reportHistogram(String name, Histogram histogram, long timestamp) throws IOException {
+
+        long count = resetCountersWhenReporting ? histogram.getCountWithReset() : histogram.getCount();
+
         final Snapshot snapshot = histogram.getSnapshot();
-        graphite.send(prefix(name, "count"), format(histogram.getCount()), timestamp);
+        graphite.send(prefix(name, "count"), format(count), timestamp);
         graphite.send(prefix(name, "max"), format(snapshot.getMax()), timestamp);
         graphite.send(prefix(name, "mean"), format(snapshot.getMean()), timestamp);
         graphite.send(prefix(name, "min"), format(snapshot.getMin()), timestamp);
@@ -261,7 +278,8 @@ public class GraphiteReporter extends ScheduledReporter {
     }
 
     private void reportCounter(String name, Counter counter, long timestamp) throws IOException {
-        graphite.send(prefix(name, "count"), format(counter.getCount()), timestamp);
+        long count = resetCountersWhenReporting ? counter.getCountWithReset() : counter.getCount();
+        graphite.send(prefix(name, "count"), format(count), timestamp);
     }
 
     private void reportGauge(String name, Gauge gauge, long timestamp) throws IOException {

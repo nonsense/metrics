@@ -120,6 +120,11 @@ public class Timer implements Metered, Sampling {
     }
 
     @Override
+    public long getCountWithReset() {
+        return histogram.getCountWithReset();
+    }
+
+    @Override
     public double getFifteenMinuteRate() {
         return meter.getFifteenMinuteRate();
     }

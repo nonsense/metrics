@@ -82,6 +82,11 @@ public class Meter implements Metered {
     }
 
     @Override
+    public long getCountWithReset() {
+        return count.sumThenReset();
+    }
+
+    @Override
     public double getFifteenMinuteRate() {
         tickIfNecessary();
         return m15Rate.getRate(TimeUnit.SECONDS);
